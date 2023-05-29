@@ -3,8 +3,8 @@ const morgan = require('morgan')
 const cors = require('cors')
 const app = express()
 
-app.use(cors())
 app.use(express.static('build'))
+app.use(cors())
 app.use(express.json())
 app.use(morgan((tokens, req, res) => [
     tokens.method(req, res),
@@ -35,11 +35,6 @@ let contacts = [
         name: "Mary Poppendieck",
         number: "39-23-6423122",
         id: 4
-    },
-    {
-        name: "ada",
-        number: "13",
-        id: 5
     }
 ]
 
