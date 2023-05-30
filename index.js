@@ -1,3 +1,4 @@
+const mongoose = require('mongoose')
 const express = require('express')
 const morgan = require('morgan')
 const cors = require('cors')
@@ -15,28 +16,24 @@ app.use(morgan((tokens, req, res) => [
     JSON.stringify(req.body)
 ].join(' ')))
 
-let contacts = [
-    {
-        name: "Arto Hellas",
-        number: "040-123456",
-        id: 1
-    },
-    {
-        name: "Ada Lovelace",
-        number: "39-44-5323523",
-        id: 2
-    },
-    {
-        name: "Dan Abramov",
-        number: "12-43-234345",
-        id: 3
-    },
-    {
-        name: "Mary Poppendieck",
-        number: "39-23-6423122",
-        id: 4
+const url = process.env.MONGODB_URL
+mongoose.set('strictQuery',false)
+mongoose.connect(url)
+
+const contactSchema = new mongoose.Schema({
+    name: String,
+    number: String,
+})
+
+contactSchema.set('toJSON', {
+    transform: (document, returnedObject) => {
+        returnedObject.id = returnedObject._id.toString()
+        delete returnedObject._id
+        delete returnedObject._v
     }
-]
+})
+
+const Contact = mongoose.model('Contact', contactSchema)
 
 const generateId = () => {
     const maxId = contacts.length > 0
@@ -46,7 +43,9 @@ const generateId = () => {
 }
 
 app.get('/api/contacts', (req, res) => {
-    res.json(contacts)
+    Contact.find({}).then(contacts => {
+        res.json(contacts)
+    })
 })
 
 app.get('/api/contacts/:id', (req, res) => {
