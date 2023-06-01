@@ -1,10 +1,10 @@
-const mongoose = require('mongoose')
+require('dotenv').config()
+const Contact = require('./models/contact')
 const express = require('express')
 const morgan = require('morgan')
 const cors = require('cors')
 const app = express()
 
-app.use(cors())
 app.use(express.static('build'))
 app.use(express.json())
 app.use(morgan((tokens, req, res) => [
@@ -15,96 +15,103 @@ app.use(morgan((tokens, req, res) => [
     tokens['response-time'](req, res), 'ms',
     JSON.stringify(req.body)
 ].join(' ')))
+app.use(cors())
 
-const url = process.env.MONGODB_URL
-mongoose.set('strictQuery',false)
-mongoose.connect(url)
 
-const contactSchema = new mongoose.Schema({
-    name: String,
-    number: String,
-})
-
-contactSchema.set('toJSON', {
-    transform: (document, returnedObject) => {
-        returnedObject.id = returnedObject._id.toString()
-        delete returnedObject._id
-        delete returnedObject._v
-    }
-})
-
-const Contact = mongoose.model('Contact', contactSchema)
-
-const generateId = () => {
-    const maxId = contacts.length > 0
-        ? Math.max(...contacts.map(n => n.id))
-        : 0
-    return maxId + 1
-}
-
-app.get('/api/contacts', (req, res) => {
+app.get('/api/contacts', (req, res, next) => {
     Contact.find({}).then(contacts => {
         res.json(contacts)
     })
+    .catch(error => next(error))
 })
 
-app.get('/api/contacts/:id', (req, res) => {
-    const id = Number(req.params.id)
-    const contact = contacts.find(contact => contact.id === id)
-
-    contact ? res.json(contact) :
-        res.status(404).end()
+app.get('/api/contacts/:id', (req, res, next) => {
+    Contact.findById(req.params.id)
+        .then(contact => {
+            if (contact) {
+                res.json(contact)
+            } else {
+                res.status(404).end()
+            }
+        })
+        .catch(error => next(error))
 })
 
-app.delete('/api/contacts/:id', (req, res) => {
-    const id = Number(req.params.id)
-    contacts = contacts.filter(contact => contact.id !== id)
-
-    res.status(204).end()
+app.delete('/api/contacts/:id', (req, res, next) => {
+    Contact.findByIdAndRemove(req.params.id)
+        .then(result => {
+            res.status(204).end()
+        })
+        .catch(error => next(error))
 })
 
 
-app.post('/api/contacts', (req, res) => {
+app.post('/api/contacts', (req, res, next) => {
     const body = req.body
 
-    if (!body.name || !body.number) {
+    if (body.name === undefined || body.number === undefined) {
         return res.status(400).json({
             error: 'missing fields'
         })
     }
-    else if (contacts.some(contact => contact.name.trim().toUpperCase() === body.name.trim().toUpperCase())) {
-        return res.status(400).json({
-            error: 'name must be unique'
-        })
-    }
+
+    const contact = new Contact({
+        name: body.name,
+        number: body.number,
+    })
+
+    contact.save().then(savedContact => {
+        res.json(savedContact)
+    })
+    .catch(error => next(error))
+})
+
+app.put('/api/contacts/:id', (req, res, next) => {
+    const body = req.body
 
     const contact = {
         name: body.name,
         number: body.number,
-        id: generateId(),
     }
-
-    contacts = contacts.concat(contact)
-
-    res.json(contact)
-})
-
-app.get('/info', (req, res) => {
-    res.send(`
-        <div>
-        <p>Phonebook has info for ${contacts.length} people</p>
-        <p>${Date()}</p>
-        </div>
-    `)
+   
+    Contact.findByIdAndUpdate(req.params.id, contact, {new: true, runValidators: true, context: "query"})
+    .then(updatedContact => {
+        res.json(updatedContact)
+    })
+    .catch(error => next(error))
 })
 
 const unknownEndpoint = (request, response) => {
     response.status(404).send({ error: 'unknown endpoint' })
 }
 
+app.get('/info', (req, res) => {
+    res.send(`
+        <div>
+        <p>Phonebook has info for ${Contact.length} people</p>
+        <p>${Date()}</p>
+        </div>
+    `)
+})
+
 app.use(unknownEndpoint)
 
-const PORT = process.env.PORT || 3001
+
+const errorHandler = (error, req, res, next) => {
+    console.error(error.message);
+
+    if (error.name === "CastError") {
+        return res.status(400).send({error: "malformatted id"})
+    } else if (error.name === "ValidationError") {
+        return res.status(400).json({ error: error.message })
+    }
+
+    next(error)
+}
+
+app.use(errorHandler)
+
+const PORT = process.env.PORT
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`)
 })
