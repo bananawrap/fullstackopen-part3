@@ -1,1 +1,1 @@
-DELETE http://localhost:3001/api/contact/4
+DELETE https://fullstackopen-puhelinluettelo.onrender.com/api/contacts/647dfd674c0d41bff44a4d32
