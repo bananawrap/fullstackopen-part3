@@ -1,7 +1,7 @@
-POST  http://localhost:3001/api/contacts
+POST https://fullstackopen-puhelinluettelo.onrender.com/api/contacts
 Content-Type: application/json
 
 {
     "name": "testi",
-    "number": "12345"
+    "number": "123-12345678"
 }
